@@ -1,0 +1,18 @@
+[
+  {
+    "publishedAt": "2026-09-03T04:24:59.932Z",
+    "topic": "The vending machine density of Japan and what it reveals",
+    "category": "culture",
+    "title": "Japan's Vending Machines Are Vanishing, and the Reason Isn't Crime",
+    "slug": "why-are-there-fewer-vending-machines-in-japan",
+    "targetQuery": "why are there fewer vending machines in japan",
+    "metaTitle": "Why Are There Fewer Vending Machines in Japan Now?",
+    "postId": "em_6fc3te1qty8yj9pbewbcbrk04v",
+    "url": "https://buttondown.com/dada823/archive/why-are-there-fewer-vending-machines-in-japan/",
+    "model": "claude-sonnet-5",
+    "usage": {
+      "inputTokens": 329,
+      "outputTokens": 4277
+    }
+  }
+]

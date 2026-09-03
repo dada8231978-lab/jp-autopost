@@ -1,0 +1,80 @@
+name: Daily Buttondown post
+
+on:
+  schedule:
+    # 03:00 UTC = 12:00 JST, every day.
+    # GitHub's scheduler is best-effort and can be delayed by several minutes.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      category:
+        description: 'Beat to write about'
+        required: false
+        default: ''
+        type: choice
+        options: ['', 'culture', 'healthcare']
+      topic:
+        description: 'Override the seed topic (optional)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Generate only, do not publish'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: daily-buttondown-post
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # to commit data/published.json back
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate and publish
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-5' }}
+          ANTHROPIC_EFFORT: ${{ vars.ANTHROPIC_EFFORT || 'high' }}
+          ANTHROPIC_MAX_TOKENS: ${{ vars.ANTHROPIC_MAX_TOKENS || '16000' }}
+          BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
+          BUTTONDOWN_EMAIL_STATUS: ${{ vars.BUTTONDOWN_EMAIL_STATUS || 'about_to_send' }}
+          BUTTONDOWN_EMAIL_TYPE: ${{ vars.BUTTONDOWN_EMAIL_TYPE || 'public' }}
+          BUTTONDOWN_EDITOR_MODE: ${{ vars.BUTTONDOWN_EDITOR_MODE || 'auto' }}
+          SUBSCRIPTION_PRICE_CENTS: ${{ vars.SUBSCRIPTION_PRICE_CENTS || '500' }}
+          TOPIC_CATEGORY: ${{ vars.TOPIC_CATEGORY || 'mixed' }}
+          TARGET_WORD_COUNT: ${{ vars.TARGET_WORD_COUNT || '1600' }}
+          SEO_RELATED_LINKS: ${{ vars.SEO_RELATED_LINKS || '3' }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ -n "${{ inputs.category }}" ]; then ARGS="$ARGS --category ${{ inputs.category }}"; fi
+          if [ -n "${{ inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ inputs.topic }}\""; fi
+          eval "npx tsx src/index.ts $ARGS"
+
+      - name: Persist publish history
+        if: success() && inputs.dry_run != true
+        run: |
+          if git diff --quiet -- data/published.json; then
+            echo "No history change to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/published.json
+          git commit -m "chore: record published article [skip ci]"
+          git push

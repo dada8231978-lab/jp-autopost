@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+data/preview-*.html
+data/reddit/
+logs/
+*.log
