@@ -37,6 +37,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Fail in seconds with an actionable message rather than after a full
+      # dependency install with one that talks about a .env file CI does not have.
+      - name: Check required secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
+        run: |
+          missing=""
+          [ -n "$ANTHROPIC_API_KEY" ]  || missing="$missing ANTHROPIC_API_KEY"
+          [ -n "$BUTTONDOWN_API_KEY" ] || missing="$missing BUTTONDOWN_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Add them under: Settings -> Secrets and variables -> Actions"
+            echo "  * Use the \"Repository secrets\" section."
+            echo "  * \"Environment secrets\" are NOT readable here - this job declares no 'environment:'."
+            echo "  * \"Variables\" is a separate tab and is not readable through secrets.*"
+            exit 1
+          fi
+          echo "Required secrets are present."
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

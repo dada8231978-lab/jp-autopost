@@ -91,7 +91,19 @@ export function loadConfig(): Config {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
-    throw new Error(`Invalid configuration. Check your .env file:\n${issues}`);
+
+    // There is no .env in CI, so pointing at one sends people to a file that
+    // does not exist instead of to the settings page that actually matters.
+    const where =
+      process.env.GITHUB_ACTIONS === 'true'
+        ? 'Invalid configuration. In GitHub Actions these come from repository secrets:\n' +
+          `${issues}\n\n` +
+          '  Settings -> Secrets and variables -> Actions -> "Repository secrets".\n' +
+          '  Environment secrets are NOT readable here: this job declares no "environment:".\n' +
+          '  "Variables" is a separate tab and is not readable through secrets.*'
+        : `Invalid configuration. Check your .env file:\n${issues}`;
+
+    throw new Error(where);
   }
 
   cached = {
