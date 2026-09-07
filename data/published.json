@@ -14,5 +14,37 @@
       "inputTokens": 329,
       "outputTokens": 4277
     }
+  },
+  {
+    "publishedAt": "2026-09-07T04:06:45.738Z",
+    "topic": "Omotenashi vs. Western hospitality: what actually differs",
+    "category": "culture",
+    "title": "Why Japanese Servers Never Ask How Your Meal Is Going",
+    "slug": "why-japanese-servers-dont-ask-how-meal-is",
+    "targetQuery": "why don't japanese servers ask how the food is",
+    "metaTitle": "Why Japanese Servers Don't Ask How Your Meal Is",
+    "postId": "em_01dhxanr228an9ppaw82tsh5sr",
+    "url": "https://buttondown.com/dada823/archive/why-japanese-servers-dont-ask-how-meal-is/",
+    "model": "claude-sonnet-5",
+    "usage": {
+      "inputTokens": 387,
+      "outputTokens": 4451
+    }
+  },
+  {
+    "publishedAt": "2026-09-07T04:12:21.638Z",
+    "topic": "Japan’s response to infectious disease: masks before the pandemic",
+    "category": "healthcare",
+    "title": "The Real Reason Masks Were Everywhere in Japan Long Before COVID",
+    "slug": "why-masks-normal-japan-before-covid-pollen",
+    "targetQuery": "why did japanese people wear masks before covid",
+    "metaTitle": "Why Did Japanese People Wear Masks Before COVID?",
+    "postId": "em_7v2pj9s0pr8hdazg2c9xppzjrt",
+    "url": "https://buttondown.com/dada823/archive/why-masks-normal-japan-before-covid-pollen/",
+    "model": "claude-sonnet-5",
+    "usage": {
+      "inputTokens": 416,
+      "outputTokens": 5659
+    }
   }
 ]
