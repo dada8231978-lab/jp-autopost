@@ -5,7 +5,7 @@
   "description": "Auto-generate English articles about Japanese culture & healthcare with Claude, and publish them to Buttondown behind a paywall.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

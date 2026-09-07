@@ -35,7 +35,7 @@ jobs:
       contents: write # to commit data/published.json back
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Fail in seconds with an actionable message rather than after a full
       # dependency install with one that talks about a .env file CI does not have.
@@ -57,9 +57,9 @@ jobs:
           fi
           echo "Required secrets are present."
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
