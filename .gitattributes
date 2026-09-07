@@ -1,0 +1,20 @@
+# Normalize every text file to LF in the repository.
+#
+# This project is edited from both macOS and Windows through a synced folder,
+# which was producing whole-file CRLF/LF diffs on every commit and burying the
+# real changes. `eol=lf` also overrides a local core.autocrlf=true, so the
+# working tree stays LF on Windows too — scripts/run.sh depends on that.
+* text=auto eol=lf
+
+# Never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# Generated; keep diffs out of review.
+package-lock.json -diff linguist-generated
