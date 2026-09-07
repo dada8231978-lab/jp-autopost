@@ -46,5 +46,21 @@
       "inputTokens": 416,
       "outputTokens": 5659
     }
+  },
+  {
+    "publishedAt": "2026-09-07T05:03:12.353Z",
+    "topic": "Why Japanese patients see doctors more often than anyone else on earth",
+    "category": "healthcare",
+    "title": "Why Japan's Prescription Rules Force Monthly Doctor Visits",
+    "slug": "why-japans-prescription-rules-force-monthly",
+    "targetQuery": "why can't you get 90-day prescriptions in japan",
+    "metaTitle": "Why Can't You Get 90-Day Prescriptions in Japan?",
+    "postId": "em_6g2mc7gdvg9efr2wyc5mwjrv2a",
+    "url": "https://buttondown.com/dada823/archive/why-japans-prescription-rules-force-monthly/",
+    "model": "claude-sonnet-5",
+    "usage": {
+      "inputTokens": 446,
+      "outputTokens": 5888
+    }
   }
 ]
