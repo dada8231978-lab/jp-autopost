@@ -81,11 +81,17 @@ async function main(): Promise<void> {
 
   // ---- 1. Choose the topic -------------------------------------------------
   const history = await loadHistory();
-  const category = args.category ?? resolveCategory(config.TOPIC_CATEGORY);
+  const category =
+    args.category ?? resolveCategory(config.TOPIC_CATEGORY, config.HEALTHCARE_RATIO, history);
   const topic = args.topic ?? pickTopic(category, history).topic;
 
   console.log(`[1/4] Topic  : ${topic}`);
-  console.log(`      Beat   : ${category}`);
+  console.log(
+    `      Beat   : ${category}` +
+      (config.TOPIC_CATEGORY === 'mixed'
+        ? ` (target ${Math.round(config.HEALTHCARE_RATIO * 100)}% healthcare)`
+        : ''),
+  );
   console.log(`      Model  : ${config.ANTHROPIC_MODEL} (effort: ${config.ANTHROPIC_EFFORT})`);
 
   // ---- 2. Verify Buttondown before spending on generation -------------------

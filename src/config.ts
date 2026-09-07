@@ -67,6 +67,11 @@ const EnvSchema = z.object({
 
   // Topics
   TOPIC_CATEGORY: z.enum(['culture', 'healthcare', 'mixed']).default('mixed'),
+
+  // With TOPIC_CATEGORY=mixed, the share of articles that should be healthcare,
+  // measured over the last 10 posts. 0.7 = roughly 7 in 10. Balanced against
+  // actual history rather than by coin flip, so the mix cannot drift.
+  HEALTHCARE_RATIO: z.coerce.number().min(0).max(1).default(0.7),
   TARGET_WORD_COUNT: z.coerce.number().int().min(600).max(4000).default(1600),
 });
 

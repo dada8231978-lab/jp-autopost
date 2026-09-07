@@ -6,3 +6,5 @@ data/preview-*.html
 data/reddit/
 logs/
 *.log
+pr-url.txt
+logs/

@@ -46,6 +46,28 @@ export const TOPIC_POOL: Record<Category, string[]> = {
     'Dementia care villages and community-based support in rural Japan',
     'Emergency medicine in Japan and the "ambulance refusal" problem',
     'Dietary salt, stroke and the Japanese public health campaign that worked',
+    'Why Japan has more CT and MRI scanners per capita than any other country',
+    'Japan’s brain-death law and why organ transplantation stayed rare',
+    'The long practice of withholding cancer diagnoses from Japanese patients',
+    'Antibiotic prescribing culture and antimicrobial resistance in Japan',
+    'Why Japan has the world’s highest per-capita rate of dialysis',
+    'Drug lag: why new medicines reached Japan years after the West',
+    'Mass gastric cancer screening: endoscopy as national policy',
+    'Why Japan has far more hospital beds per capita than comparable countries',
+    'The 7-to-1 nurse staffing rule and how reimbursement reshaped hospitals',
+    'Medical corporations (iryo hojin) and why Japanese hospitals stay family-run',
+    'The HPV vaccine suspension and a decade of vaccine hesitancy',
+    'Palliative care and Japan’s late adoption of hospice medicine',
+    'Why Japanese patients see doctors more often than anyone else on earth',
+    'Free ambulance rides in Japan and the consequences of zero price',
+    'Japan’s fast-track approval pathway for regenerative medicine',
+    'Tuberculosis in Japan: a persistent outlier among wealthy countries',
+    'The foreign care worker programs filling Japan’s kaigo shortage',
+    'Blood donation and Japan’s domestic self-sufficiency policy',
+    'Suicide prevention policy in Japan and what actually moved the numbers',
+    'Pharmacogenomics: why standard drug doses differ for Japanese patients',
+    'Japan’s national cancer registry and what it revealed about survival',
+    'Health effects research after Fukushima and the thyroid screening debate',
   ],
 };
 
@@ -91,10 +113,31 @@ export function pickTopic(
   return { topic: leastRecent, category };
 }
 
-/** Resolve the configured category, expanding "mixed" into a coin flip. */
-export function resolveCategory(configured: 'culture' | 'healthcare' | 'mixed'): Category {
+/** How many recent posts the mix is balanced over. */
+const MIX_WINDOW = 10;
+
+/**
+ * Resolve the configured category, expanding "mixed" using the recent history.
+ *
+ * A coin flip does not hold a ratio - it happily produces five culture pieces
+ * in a row. This looks at what was actually published recently and picks
+ * whichever beat moves the mix back toward `healthcareRatio`, so the balance
+ * self-corrects instead of drifting.
+ */
+export function resolveCategory(
+  configured: 'culture' | 'healthcare' | 'mixed',
+  healthcareRatio = 0.7,
+  history: readonly PublishRecord[] = [],
+): Category {
   if (configured !== 'mixed') return configured;
-  return Math.random() < 0.5 ? 'culture' : 'healthcare';
+  if (healthcareRatio >= 1) return 'healthcare';
+  if (healthcareRatio <= 0) return 'culture';
+
+  const recent = history.slice(-MIX_WINDOW);
+  if (recent.length === 0) return 'healthcare';
+
+  const share = recent.filter((h) => h.category === 'healthcare').length / recent.length;
+  return share < healthcareRatio ? 'healthcare' : 'culture';
 }
 
 /**

@@ -71,17 +71,19 @@ export class ButtondownClient {
 
   /** Confirm the API key works and report who it belongs to. */
   async verify(): Promise<{ username: string; subscribers: number }> {
-    const me = await this.request<{
-      username?: string;
-      subscriber_count?: number;
-      email?: string;
+    // This endpoint is paginated - the newsletter lives in results[0], and the
+    // object it returns carries no subscriber count, so that comes separately.
+    const page = await this.request<{
+      results?: Array<{ username?: string; name?: string }>;
     }>('newsletters');
 
-    // The newsletters endpoint shape varies by account age; fall back to the
-    // subscriber listing for a count we can always trust.
-    const subscribers = me.subscriber_count ?? (await this.countSubscribers());
+    const newsletter = page.results?.[0];
+    const name = newsletter?.name?.trim();
+    const username = newsletter?.username?.trim();
 
-    return { username: me.username ?? me.email ?? '(unknown)', subscribers };
+    const label = name && username ? `${name} (@${username})` : (name ?? username ?? '(unknown)');
+
+    return { username: label, subscribers: await this.countSubscribers() };
   }
 
   /** Total subscriber count, read from the paginated list endpoint. */
