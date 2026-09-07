@@ -17,7 +17,7 @@ LOG="logs/post-$(date +%Y-%m-%d).log"
   # Never fails the run - the article is already published by this point, and a
   # git problem must not be reported as a publishing failure.
   if [ -d .git ]; then
-    git add data/published.json data/articles || true
+    git add data/history data/published.json data/articles || true
     if git diff --cached --quiet; then
       echo "git: nothing to commit"
     else

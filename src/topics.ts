@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import type { Article, Category, PublishRecord } from './types.js';
 
 const HISTORY_PATH = resolve(process.cwd(), 'data/published.json');
+const HISTORY_DIR = resolve(process.cwd(), 'data/history');
 const ARTICLES_DIR = resolve(process.cwd(), 'data/articles');
 
 /**
@@ -71,11 +72,27 @@ export const TOPIC_POOL: Record<Category, string[]> = {
   ],
 };
 
-/** Read the publish history (empty on first run). */
+/**
+ * Read the publish history, oldest first.
+ *
+ * Merges the one-file-per-publish records in data/history with the legacy
+ * data/published.json array, so histories written before the split are not
+ * lost and no migration step is needed.
+ */
 export async function loadHistory(): Promise<PublishRecord[]> {
+  const [legacy, split] = await Promise.all([readLegacyHistory(), readSplitHistory()]);
+
+  const byKey = new Map<string, PublishRecord>();
+  for (const record of [...legacy, ...split]) {
+    byKey.set(record.postId || `${record.publishedAt}-${record.slug}`, record);
+  }
+
+  return [...byKey.values()].sort((a, b) => a.publishedAt.localeCompare(b.publishedAt));
+}
+
+async function readLegacyHistory(): Promise<PublishRecord[]> {
   try {
-    const raw = await readFile(HISTORY_PATH, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(await readFile(HISTORY_PATH, 'utf8'));
     return Array.isArray(parsed) ? (parsed as PublishRecord[]) : [];
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -83,12 +100,39 @@ export async function loadHistory(): Promise<PublishRecord[]> {
   }
 }
 
-/** Append one record to the history file. */
+async function readSplitHistory(): Promise<PublishRecord[]> {
+  let files: string[];
+  try {
+    files = await readdir(HISTORY_DIR);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+
+  const records = await Promise.all(
+    files
+      .filter((f) => f.endsWith('.json'))
+      .map(async (f) => JSON.parse(await readFile(resolve(HISTORY_DIR, f), 'utf8')) as PublishRecord),
+  );
+  return records;
+}
+
+/**
+ * Write one record as its own file.
+ *
+ * Deliberately not an append to a shared array. Two runs dispatched from the
+ * same commit both edited the tail of data/published.json, so the second one's
+ * rebase conflicted and its record was silently lost while the article itself
+ * had already been published. Separate files cannot collide.
+ */
 export async function appendHistory(record: PublishRecord): Promise<void> {
-  const history = await loadHistory();
-  history.push(record);
-  await mkdir(dirname(HISTORY_PATH), { recursive: true });
-  await writeFile(HISTORY_PATH, `${JSON.stringify(history, null, 2)}\n`, 'utf8');
+  await mkdir(HISTORY_DIR, { recursive: true });
+  const stamp = record.publishedAt.replace(/[:.]/g, '-');
+  await writeFile(
+    resolve(HISTORY_DIR, `${stamp}-${record.slug}.json`),
+    `${JSON.stringify(record, null, 2)}\n`,
+    'utf8',
+  );
 }
 
 /**

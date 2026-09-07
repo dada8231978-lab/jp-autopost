@@ -49,7 +49,7 @@ catch {
 # ---------------------------------------------------------------------------
 if (Test-Path (Join-Path $projectDir '.git')) {
     try {
-        & git add data/published.json data/articles
+        & git add data/history data/published.json data/articles
         & git diff --cached --quiet
         if ($LASTEXITCODE -eq 0) {
             Write-Log 'git: nothing to commit'

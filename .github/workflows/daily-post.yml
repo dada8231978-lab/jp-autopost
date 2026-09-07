@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write # to commit data/published.json back
+      contents: write # to commit the publish history back
 
     steps:
       - uses: actions/checkout@v5
@@ -92,7 +92,7 @@ jobs:
           # data/articles holds the article bodies. `npm run reddit` reads them,
           # so committing only published.json would leave every cloud-published
           # article impossible to promote later.
-          git add data/published.json data/articles
+          git add data/history data/published.json data/articles
           if git diff --cached --quiet; then
             echo "No history change to commit."
             exit 0
