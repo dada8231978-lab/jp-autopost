@@ -17,7 +17,9 @@
 │   ├── html.ts           モデル出力 HTML のサニタイズ
 │   ├── config.ts         .env の検証
 │   └── types.ts          記事スキーマ（zod）
-├── .github/workflows/daily-post.yml   GitHub Actions で毎日1回投稿
+├── data/history/         公開履歴（1記事=1ファイル。同時実行で衝突しない形式）
+├── data/articles/        記事本文（npm run reddit が参照）
+├── .github/workflows/daily-post.yml   GitHub Actions で毎日1回投稿（12:00 JST）
 ├── scripts/run.sh / run.ps1           cron / Windows タスクスケジューラ用
 ├── crontab.example
 └── .env.example
@@ -273,15 +275,37 @@ Reddit は人間が関与し続けないと機能しません。
 
 ### A. GitHub Actions（推奨・サーバー不要）
 
-`.github/workflows/daily-post.yml` が毎日 22:00 UTC（= 07:00 JST）に実行します。
+`.github/workflows/daily-post.yml` が毎日 03:00 UTC（= 12:00 JST）に実行します。
 
 リポジトリの **Settings → Secrets and variables → Actions** で設定:
 
 - **Secrets**: `ANTHROPIC_API_KEY`, `BUTTONDOWN_API_KEY`
 - **Variables**: 任意（すべて既定値あり）
 
+**Secret は必ず「Repository secrets」に登録してください。** 同じページには紛らわしい登録先が
+2つあり、どちらも画面上は正しく設定できたように見えます。
+
+| 登録先 | 結果 |
+|---|---|
+| **Repository secrets** | ✅ 読める |
+| Environment secrets | ❌ 読めない。このジョブは `environment:` を宣言していないため |
+| Variables タブ | ❌ 読めない。`secrets.*` とは別物 |
+
+送信するかどうかは Variables で切り替えられます（コード変更不要）。
+
+| `BUTTONDOWN_EMAIL_STATUS` | 動作 |
+|---|---|
+| `draft` | 下書き保存のみ。内容を確認してから手動送信 |
+| 未設定（既定 `about_to_send`） | 購読者へ即送信 |
+
 `workflow_dispatch` で手動実行もでき、`dry_run` / `category` / `topic` を指定できます。
-投稿履歴 `data/published.json` は自動コミットされ、次回のトピック重複を防ぎます。
+投稿履歴（`data/history/` と `data/articles/`）は自動コミットされ、トピックの重複と
+内部リンク切れを防ぎます。
+
+**手動実行を連続で2回叩かないでください。** `workflow_dispatch` の `github.sha` は起動時では
+なく**ディスパッチ時**に固定されるため、2つの実行が同じコミットから始まります。以前これで
+履歴が1件失われました（記事は投稿済みなのに記録だけ消える）。現在は1実行=1ファイル形式に
+してあるので衝突しませんが、記事が2本出ることに変わりはありません。
 
 ### B. cron（Linux / macOS）
 
@@ -351,7 +375,8 @@ ANTHROPIC_EFFORT=xhigh            # 推論の深さ: low|medium|high|xhigh|max
 | 400 エラーで項目名が出る | その項目を `.env` で許可値に修正。自動リトライも走ります |
 | HTMLがそのまま表示される | `.env` で `BUTTONDOWN_EDITOR_MODE=fancy` に変更 |
 | `stop_reason: max_tokens` | `ANTHROPIC_MAX_TOKENS` を増やす |
-| 同じような記事が続く | `data/published.json` を消さないこと |
+| 同じような記事が続く | `data/history/` を消さないこと |
+| 投稿は成功したのに履歴が残らない | 手動実行を連続で叩いていないか確認。詳細はスケジューリングの項 |
 | Reddit `SUBREDDIT_NOTALLOWED` | BAN済み、またはカルマ/アカウント年齢が不足 |
 | Reddit `RATELIMIT` | 投稿頻度が高すぎます。日を空けてください |
 | Reddit `MISSING_FLAIR` | `npm run reddit -- --flairs <sub>` でIDを取得し `.env` に設定 |
