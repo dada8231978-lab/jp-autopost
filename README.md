@@ -19,7 +19,7 @@
 │   └── types.ts          記事スキーマ（zod）
 ├── data/history/         公開履歴（1記事=1ファイル。同時実行で衝突しない形式）
 ├── data/articles/        記事本文（npm run reddit が参照）
-├── .github/workflows/daily-post.yml   GitHub Actions で毎日1回投稿（12:00 JST）
+├── .github/workflows/daily-post.yml   GitHub Actions で毎日1回投稿（11:47 JST 目安）
 ├── scripts/run.sh / run.ps1           cron / Windows タスクスケジューラ用
 ├── crontab.example
 └── .env.example
@@ -275,7 +275,15 @@ Reddit は人間が関与し続けないと機能しません。
 
 ### A. GitHub Actions（推奨・サーバー不要）
 
-`.github/workflows/daily-post.yml` が毎日 03:00 UTC（= 12:00 JST）に実行します。
+`.github/workflows/daily-post.yml` が毎日 02:47 UTC（= 11:47 JST）に実行します。
+
+**時刻が半端なのは意図的です。** GitHub のスケジューラは同じ分に発火する全リポジトリを
+キューイングするため、毎時00分は最も混雑します。実際、最初の 03:00 UTC 指定では
+**07:57 UTC（約5時間遅れ）** に実行されました。半端な分にずらし、さらに13分早めることで、
+通常の遅延なら 12:00 JST 前後に着地します。
+
+ただし**分単位の正確さには依存しないでください。** GitHub はスケジュール実行の遅延を保証せず、
+リポジトリが60日間無活動だとスケジュール自体を停止します。
 
 リポジトリの **Settings → Secrets and variables → Actions** で設定:
 
