@@ -125,7 +125,12 @@ export class ButtondownClient {
     try {
       return await this.request<ButtondownEmail>('emails', { method: 'POST', body: full });
     } catch (error) {
-      if (!(error instanceof ButtondownError) || error.status !== 400) throw error;
+      // Buttondown reports schema violations as 422, not 400. Checking only for
+      // 400 meant this fallback could never fire: the daily run would abort on
+      // exactly the field-drift it was written to survive.
+      const validationFailed =
+        error instanceof ButtondownError && (error.status === 400 || error.status === 422);
+      if (!validationFailed) throw error;
 
       const rejected = OPTIONAL_FIELDS.filter((f) => error.body.includes(f));
       if (rejected.length === 0) throw error;
