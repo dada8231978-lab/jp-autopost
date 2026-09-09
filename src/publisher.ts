@@ -62,6 +62,46 @@ export interface RelatedLink {
 }
 
 /**
+ * Keep only the links whose archive page actually exists.
+ *
+ * A Buttondown email that is still a draft has no public page — its archive
+ * URL returns 404. Linking to one puts a dead link on a page we want search
+ * engines to rank, which is worse than having no link at all. Candidates are
+ * checked newest-first and the first `limit` live ones are kept.
+ */
+export async function filterLiveLinks(
+  candidates: readonly RelatedLink[],
+  limit: number,
+  timeoutMs = 5000,
+): Promise<RelatedLink[]> {
+  const live: RelatedLink[] = [];
+
+  for (const candidate of candidates) {
+    if (live.length >= limit) break;
+    if (await isLive(candidate.url, timeoutMs)) live.push(candidate);
+  }
+
+  return live;
+}
+
+async function isLive(url: string, timeoutMs: number): Promise<boolean> {
+  if (!/^https?:\/\//.test(url)) return false;
+
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return response.ok;
+  } catch {
+    // Network trouble is not proof the page is missing, but including a link we
+    // could not verify risks publishing a dead one. Skipping costs only a link.
+    return false;
+  }
+}
+
+/**
  * Assemble the post: free section, internal links, paywall, paid body.
  *
  * The related-links block sits ABOVE the paywall on purpose. Search crawlers

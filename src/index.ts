@@ -2,7 +2,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadConfig } from './config.js';
 import { generateArticle } from './generator.js';
-import { Publisher, buildPostHtml, type RelatedLink } from './publisher.js';
+import { Publisher, buildPostHtml, filterLiveLinks, type RelatedLink } from './publisher.js';
 import {
   appendHistory,
   loadHistory,
@@ -121,15 +121,26 @@ async function main(): Promise<void> {
   const paidWords = countWords(article.paid_body_html);
   // Internal links to earlier archive pages, newest first. These go above the
   // paywall so crawlers can actually follow them.
-  const related: RelatedLink[] = history
+  //
+  // Verified live before use: an article still sitting as a draft has no public
+  // page, so linking to it would publish a 404 on a page meant to rank. Take
+  // more candidates than needed and keep the first that resolve.
+  const candidates: RelatedLink[] = history
     .filter((h) => /^https?:\/\//.test(h.url) && h.slug !== article.slug)
-    .slice(-config.SEO_RELATED_LINKS)
     .reverse()
+    .slice(0, config.SEO_RELATED_LINKS * 3)
     .map((h) => ({ title: h.title, url: h.url }));
+
+  const related = await filterLiveLinks(candidates, config.SEO_RELATED_LINKS);
 
   console.log(`[3/4] Title  : ${article.title}`);
   console.log(`      Query  : "${article.target_query}"`);
-  console.log(`      Links  : ${related.length} internal (above paywall)`);
+  console.log(
+    `      Links  : ${related.length} internal (above paywall)` +
+      (candidates.length > related.length
+        ? `, ${candidates.length - related.length} skipped (not published yet)`
+        : ''),
+  );
   console.log(`      Words  : ${freeWords} free + ${paidWords} paid`);
   console.log(`      Tags   : ${article.tags.join(', ')}`);
   console.log(`      Tokens : ${usage.inputTokens} in / ${usage.outputTokens} out`);
