@@ -1,0 +1,16 @@
+{
+  "publishedAt": "2026-09-09T07:35:31.712Z",
+  "topic": "Antibiotic prescribing culture and antimicrobial resistance in Japan",
+  "category": "healthcare",
+  "title": "Why Japanese Doctors Still Prescribe Antibiotics for the Common Cold",
+  "slug": "why-japanese-doctors-still-prescribe-antibiotics",
+  "targetQuery": "why do japanese doctors prescribe antibiotics for colds",
+  "metaTitle": "Why Do Japanese Doctors Prescribe Antibiotics for Colds?",
+  "postId": "em_4yqtqv4prx8rksnwcg7dckp723",
+  "url": "https://buttondown.com/dada823/archive/why-japanese-doctors-still-prescribe-antibiotics/",
+  "model": "claude-sonnet-5",
+  "usage": {
+    "inputTokens": 543,
+    "outputTokens": 5824
+  }
+}
