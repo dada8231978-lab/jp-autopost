@@ -16,7 +16,8 @@
     "reddit": "tsx src/reddit-post.ts",
     "seo": "tsx src/seo.ts",
     "status": "tsx src/status.ts",
-    "publish": "tsx src/publish.ts"
+    "publish": "tsx src/publish.ts",
+    "dashboard": "tsx src/dashboard.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
