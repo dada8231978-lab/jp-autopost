@@ -93,6 +93,24 @@ export class ButtondownClient {
     return page.results ?? [];
   }
 
+  /** One email by id. */
+  async getEmail(id: string): Promise<ButtondownEmail> {
+    return this.request<ButtondownEmail>(`emails/${id}`);
+  }
+
+  /**
+   * Move an email to another status.
+   *
+   * The create call cannot reliably publish - whatever status it asks for, the
+   * API returns a draft - so publishing is a separate transition.
+   */
+  async setEmailStatus(id: string, status: string): Promise<ButtondownEmail> {
+    return this.request<ButtondownEmail>(`emails/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    });
+  }
+
   /** Total subscriber count, read from the paginated list endpoint. */
   async countSubscribers(): Promise<number> {
     const page = await this.request<{ count?: number }>('subscribers?page=1');

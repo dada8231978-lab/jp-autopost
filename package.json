@@ -16,7 +16,8 @@
     "verify": "tsx src/verify.ts",
     "reddit": "tsx src/reddit-post.ts",
     "seo": "tsx src/seo.ts",
-    "status": "tsx src/status.ts"
+    "status": "tsx src/status.ts",
+    "publish": "tsx src/publish.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

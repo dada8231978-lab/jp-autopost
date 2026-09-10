@@ -39,12 +39,32 @@ export class Publisher {
   }
 
   async publish(article: Article, related: RelatedLink[] = []): Promise<PublishResult> {
-    const email: ButtondownEmail = await this.client.createEmail({
+    let email: ButtondownEmail = await this.client.createEmail({
       subject: article.title,
       body: buildPostHtml(article, related),
       slug: article.slug,
       description: article.meta_description,
     });
+
+    // Creating an email always yields a draft, whatever status the create call
+    // asked for — and a draft has no public archive page, so the article is
+    // invisible to readers and crawlers while the run reports success.
+    // Publishing is a separate transition, so make it here rather than leaving
+    // the configured status silently meaningless.
+    const wanted = this.config.BUTTONDOWN_EMAIL_STATUS;
+    if (wanted !== 'draft' && email.status === 'draft') {
+      try {
+        email = await this.client.setEmailStatus(email.id, wanted);
+      } catch (error) {
+        // The article exists either way; losing the transition costs visibility,
+        // not content. Say so loudly instead of failing a run that did publish.
+        console.warn(
+          `[publisher] Created the article but could not move it to "${wanted}": ` +
+            `${error instanceof Error ? error.message.slice(0, 200) : error}\n` +
+            '  It is still a draft with no public page. Run `npm run publish -- --confirm`.',
+        );
+      }
+    }
 
     return {
       id: email.id,
