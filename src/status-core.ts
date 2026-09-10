@@ -177,6 +177,8 @@ export const jst = (d: Date): string =>
 // ---------------------------------------------------------------------------
 
 export interface RenderInput {
+  archiveRootLive?: boolean | null;
+  archiveRootUrl?: string | null;
   runs: Run[];
   emails: Email[];
   history: PublishRecord[];
@@ -206,8 +208,19 @@ export function renderHtml(d: RenderInput): string {
   const cost = costOf(d.history);
 
   const problems: string[] = [];
-  if (drafts.length) problems.push(`${drafts.length}件が下書きのまま — 公開ページが存在しません`);
-  if (dead.length) problems.push(`${dead.length}件のアーカイブページが 404 です`);
+
+  // Order matters: a dead newsletter page explains every other 404, so lead
+  // with it instead of listing symptoms that share one cause.
+  if (d.archiveRootLive === false) {
+    problems.push(
+      'ニュースレターの公開ページ全体が 404 です — 記事単位の問題ではなく、' +
+        'Buttondown アカウント側でアーカイブが停止しています。' +
+        '記事の再公開では直りません。Buttondown サポートへの連絡が必要です。',
+    );
+  } else {
+    if (drafts.length) problems.push(`${drafts.length}件が下書きのまま — 公開ページが存在しません`);
+    if (dead.length) problems.push(`${dead.length}件のアーカイブページが 404 です`);
+  }
   if (lastRun && lastRun.conclusion === 'failure') problems.push(`最新の実行 #${lastRun.number} が失敗しています`);
   if (d.avgDelay !== null && d.avgDelay > 60) {
     problems.push(`スケジュール実行が平均 ${Math.floor(d.avgDelay / 60)}時間${d.avgDelay % 60}分 遅れています`);
@@ -358,6 +371,9 @@ export function renderHtml(d: RenderInput): string {
 // ---------------------------------------------------------------------------
 
 export interface Status extends RenderInput {
+  /** The newsletter's own public page. null when it could not be checked. */
+  archiveRootLive: boolean | null;
+  archiveRootUrl: string | null;
   lastRun: Run | undefined;
   failures: Run[];
   delays: number[];
@@ -399,6 +415,12 @@ export async function collectStatus(
     })(),
   ]);
 
+  // If the newsletter's own page is gone, every article 404s for one reason
+  // and none of them are worth investigating individually.
+  const anyUrl = emails.find((e) => e.url)?.url ?? null;
+  const archiveRootUrl = anyUrl ? anyUrl.replace(/\/archive\/.*$/, '') : null;
+  const archiveRootLive = archiveRootUrl ? await isLive(archiveRootUrl) : null;
+
   const delays = runs
     .filter((r) => r.event === 'schedule')
     .map((r) => r.delayMinutes)
@@ -426,6 +448,8 @@ export async function collectStatus(
       ? recent.filter((r) => r.category === 'healthcare').length / recent.length
       : 0,
     gaps: cal.slice(0, -1).filter((d) => d.count === 0 && !d.before).length,
+    archiveRootLive,
+    archiveRootUrl,
     cost: costOf(history),
     breakEven: Math.ceil(900 / netAfterStripe(config.SUBSCRIPTION_PRICE_CENTS)),
   };
