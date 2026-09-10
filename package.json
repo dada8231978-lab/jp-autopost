@@ -15,7 +15,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "tsx src/verify.ts",
     "reddit": "tsx src/reddit-post.ts",
-    "seo": "tsx src/seo.ts"
+    "seo": "tsx src/seo.ts",
+    "status": "tsx src/status.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -8,6 +8,7 @@ export interface ButtondownEmail {
   email_type?: string;
   absolute_url?: string;
   publish_date?: string;
+  creation_date?: string;
 }
 
 export interface CreateEmailInput {
@@ -84,6 +85,12 @@ export class ButtondownClient {
     const label = name && username ? `${name} (@${username})` : (name ?? username ?? '(unknown)');
 
     return { username: label, subscribers: await this.countSubscribers() };
+  }
+
+  /** Every email the newsletter has, oldest first. */
+  async listEmails(): Promise<ButtondownEmail[]> {
+    const page = await this.request<{ results?: ButtondownEmail[] }>('emails?page=1');
+    return page.results ?? [];
   }
 
   /** Total subscriber count, read from the paginated list endpoint. */
