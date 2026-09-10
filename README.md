@@ -256,12 +256,6 @@ npm run reddit -- --whoami
 
 ### 使い方
 
-**このプロジェクトに起動できるサーバーはありません。** 記事を生成して配信するCLIツールです。
-エディタが `npm run dev` や `npm run start` を dev サーバーと誤認して `.claude/launch.json` を
-生成することがありますが、これらのスクリプトは実際には**記事を生成して即座に公開**します。
-誤って起動されないよう、`dev` / `start` は意図的に削除してあります（過去に2回生成されました）。
-`.claude/launch.json` を見つけたら削除してください。
-
 ```bash
 npm run reddit                      # 下書きを data/reddit/ に出力（投稿しない）
 npm run reddit -- --sub japanlife   # 投稿先を指定
