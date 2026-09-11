@@ -1,20 +1,24 @@
 name: Daily Buttondown post
 
 on:
-  schedule:
-    # 02:47 UTC = 11:47 JST, every day.
-    #
-    # Deliberately not on the hour. GitHub's scheduler queues every repository
-    # firing at the same minute, and :00 is by far the most contested — the
-    # first run of this workflow at 03:00 UTC did not start until 07:57 UTC,
-    # almost five hours late. An odd minute avoids that pile-up, and starting
-    # 13 minutes early leaves room for the delay that remains, so a normal day
-    # lands near 12:00 JST.
-    #
-    # It is still best-effort: GitHub makes no latency guarantee for scheduled
-    # workflows and drops them entirely if the repository goes 60 days without
-    # activity. Do not depend on the exact minute.
-    - cron: '47 2 * * *'
+  # Scheduled runs paused 2026-09-11: Buttondown did not approve the account,
+  # so the public archive is down and publishing fails. Every run until that is
+  # resolved would only add an invisible draft, and automated posting during the
+  # account review can only hurt it. Uncomment the block below to resume.
+  # schedule:
+  #   # 02:47 UTC = 11:47 JST, every day.
+  #   #
+  #   # Deliberately not on the hour. GitHub's scheduler queues every repository
+  #   # firing at the same minute, and :00 is by far the most contested — the
+  #   # first run of this workflow at 03:00 UTC did not start until 07:57 UTC,
+  #   # almost five hours late. An odd minute avoids that pile-up, and starting
+  #   # 13 minutes early leaves room for the delay that remains, so a normal day
+  #   # lands near 12:00 JST.
+  #   #
+  #   # It is still best-effort: GitHub makes no latency guarantee for scheduled
+  #   # workflows and drops them entirely if the repository goes 60 days without
+  #   # activity. Do not depend on the exact minute.
+  #   - cron: '47 2 * * *'
   workflow_dispatch:
     inputs:
       category:
