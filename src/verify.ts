@@ -54,10 +54,7 @@ async function main(): Promise<void> {
   console.log('\nPosting settings');
   console.log(`  status   : ${config.BUTTONDOWN_EMAIL_STATUS}`);
   console.log(`  audience : ${config.BUTTONDOWN_EMAIL_TYPE}`);
-  if (config.BUTTONDOWN_EMAIL_STATUS === 'draft') {
-    console.log('  -> Articles are saved as drafts. Nothing is sent until you press send.');
-    console.log('     Set BUTTONDOWN_EMAIL_STATUS=about_to_send to publish automatically.');
-  }
+  console.log('  -> 公開は npm run publish -- drafts/<slug>.md --confirm でのみ行います。');
 
   console.log(
     '\nReminder: the subscription price itself is set in Buttondown ->\n' +

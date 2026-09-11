@@ -12,7 +12,7 @@ const EnvSchema = z.object({
   // Unattended daily runs should not lose a whole day to one short response.
   GENERATION_ATTEMPTS: z.coerce.number().int().min(1).max(5).default(3),
 
-  // Buttondown. Validated lazily by assertButtondownConfig() so `--dry-run`,
+  // Buttondown. Validated lazily by assertButtondownConfig() so drafting,
   // which never touches Buttondown, works before the account is set up.
   BUTTONDOWN_API_KEY: z.string().default(''),
   BUTTONDOWN_API_BASE: z.string().default('https://api.buttondown.com/v1'),
@@ -64,6 +64,12 @@ const EnvSchema = z.object({
   // Number of crawlable internal links to earlier articles, placed above the
   // paywall. 0 disables. More than ~5 starts to read as a link farm.
   SEO_RELATED_LINKS: z.coerce.number().int().min(0).max(5).default(3),
+
+  // Minimum share of words that must differ from the AI draft before
+  // `npm run publish` will send it. A guard against publishing machine prose
+  // unedited, which Buttondown's acceptable use policy prohibits. It measures
+  // change, not authorship.
+  MIN_EDIT_RATIO: z.coerce.number().min(0).max(1).default(0.3),
 
   // Topics
   TOPIC_CATEGORY: z.enum(['culture', 'healthcare', 'mixed']).default('mixed'),
@@ -126,7 +132,7 @@ export function assertButtondownConfig(config: Config): void {
     throw new Error(
       'BUTTONDOWN_API_KEY is empty.\n' +
         '  Get it from Buttondown -> Settings -> Programming -> API key.\n\n' +
-        'Run `npm run dry-run` to generate and preview an article without Buttondown.',
+        '`npm run draft` works without it: drafting never touches Buttondown.',
     );
   }
 

@@ -31,7 +31,7 @@ async function main(): Promise<void> {
       ? 'なし'
       : `${s.failures.length}件 (#${s.failures.map((f) => f.number).join(', #')})`,
   );
-  if (s.avgDelay !== null) {
+  if (s.cron && s.avgDelay !== null) {
     line(
       'スケジュール遅延',
       `平均 ${Math.floor(s.avgDelay / 60)}時間${s.avgDelay % 60}分 / 最大 ${Math.max(...s.delays)}分`,
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   }
   line(
     '次回予定',
-    s.next ? `${jst(s.next)} JST (遅延見込み込みで +${s.avgDelay ?? 0}分)` : '(cron未検出)',
+    s.next ? `${jst(s.next)} JST (遅延見込み込みで +${s.avgDelay ?? 0}分)` : '自動実行なし（人が公開する運用）',
   );
 
   console.log('\n[記事]');
@@ -54,7 +54,6 @@ async function main(): Promise<void> {
     '14日カレンダー',
     s.cal.map((d) => (d.before ? ' ' : d.count === 0 ? '·' : d.count > 1 ? '#' : '■')).join(''),
   );
-  if (s.gaps > 0) line('', `↑ ${s.gaps}日、記事が出ていません`);
 
   console.log('\n[コスト]');
   line(

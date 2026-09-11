@@ -177,6 +177,7 @@ export class ButtondownClient {
 
   /** Prepend the editor-mode comment when the mode is pinned in .env. */
   private withEditorMode(body: string): string {
+    if (body.startsWith('<!-- buttondown-editor-mode')) return body;
     const mode = this.config.BUTTONDOWN_EDITOR_MODE;
     if (mode === 'auto') return body;
     return `<!-- buttondown-editor-mode: ${mode} -->\n${body}`;

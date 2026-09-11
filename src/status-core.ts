@@ -222,11 +222,9 @@ export function renderHtml(d: RenderInput): string {
     if (dead.length) problems.push(`${dead.length}件のアーカイブページが 404 です`);
   }
   if (lastRun && lastRun.conclusion === 'failure') problems.push(`最新の実行 #${lastRun.number} が失敗しています`);
-  if (d.avgDelay !== null && d.avgDelay > 60) {
+  if (d.cron && d.avgDelay !== null && d.avgDelay > 60) {
     problems.push(`スケジュール実行が平均 ${Math.floor(d.avgDelay / 60)}時間${d.avgDelay % 60}分 遅れています`);
   }
-  const gapDays = d.cal.slice(0, -1).filter((x) => x.count === 0 && !x.before).length;
-  if (gapDays > 0) problems.push(`直近14日のうち ${gapDays}日、記事が出ていません`);
 
   const healthy = problems.length === 0;
 
@@ -339,7 +337,7 @@ export function renderHtml(d: RenderInput): string {
 <section>
   <h2>スケジュール</h2>
   <table>
-    <tr><td>cron</td><td class="mono">${d.cron ? `${String(d.cron.hour).padStart(2, '0')}:${String(d.cron.minute).padStart(2, '0')} UTC` : '(未検出)'}</td></tr>
+    <tr><td>cron</td><td class="mono">${d.cron ? `${String(d.cron.hour).padStart(2, '0')}:${String(d.cron.minute).padStart(2, '0')} UTC` : 'なし（人が公開する運用）'}</td></tr>
     <tr><td>平均遅延</td><td class="mono ${d.avgDelay !== null && d.avgDelay > 60 ? 'warn' : ''}">${d.avgDelay === null ? '—' : `${Math.floor(d.avgDelay / 60)}時間${d.avgDelay % 60}分`}</td></tr>
     <tr><td>次回の予定</td><td class="mono">${d.next ? `${jst(d.next)} JST` : '—'}</td></tr>
   </table>

@@ -9,15 +9,14 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "post": "tsx src/index.ts",
-    "dry-run": "tsx src/index.ts --dry-run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "tsx src/verify.ts",
     "reddit": "tsx src/reddit-post.ts",
     "seo": "tsx src/seo.ts",
     "status": "tsx src/status.ts",
     "publish": "tsx src/publish.ts",
-    "dashboard": "tsx src/dashboard.ts"
+    "dashboard": "tsx src/dashboard.ts",
+    "draft": "tsx src/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

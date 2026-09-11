@@ -1,37 +1,45 @@
+import { relative } from 'node:path';
 import { loadConfig } from './config.js';
-import { ButtondownClient, type ButtondownEmail } from './buttondown.js';
+import { ButtondownClient } from './buttondown.js';
+import { appendHistory, loadHistory, saveArticle } from './topics.js';
+import { archiveDraft, inspectDraft, listDrafts, pct, type DraftInspection } from './draft-file.js';
+import { buildBody, filterLiveLinks } from './publisher.js';
 
 /**
- * Publish articles that were created but never sent.
+ * Publish a draft the author has rewritten and fact-checked.
  *
- * Every email the API creates lands as a draft, whatever `status` the create
- * call asked for, and a draft has no public archive page — its URL 404s. So an
- * article that the daily job reports as published is invisible until something
- * moves it out of draft. Until now that something was a human clicking send in
- * the Buttondown UI, which is not automation.
- *
- * Separating publish from create also makes the dangerous half explicit: this
- * is the command that makes writing public, so it refuses to act without
- * --confirm and shows exactly what it would touch first.
+ * This is the only path to publication, and a human has to walk it: the draft
+ * must differ enough from what the model wrote, every factual claim on its
+ * checklist must be ticked or removed, and nothing is sent without --confirm.
+ * Buttondown's acceptable use policy prohibits prose that is primarily machine
+ * generated; these checks are what keep that from happening by accident.
  */
 
-const POLL_ATTEMPTS = 6;
-const POLL_INTERVAL_MS = 5000;
-
-/** States that mean the article is on its way out or already out. */
-const PUBLISHED = new Set(['sent', 'about_to_send', 'in_flight', 'scheduled', 'throttled']);
-
 const HELP = `
-Publish articles that are still sitting as drafts.
+Check a draft and publish it.
 
 Usage:
-  npm run publish              List the drafts and what would happen (no changes)
-  npm run publish -- --confirm Actually publish them
-  npm run publish -- --limit 1 Only the oldest N drafts
+  npm run publish                              List drafts and whether each can be published
+  npm run publish -- drafts/<slug>.md          Check one draft and show what would be sent
+  npm run publish -- drafts/<slug>.md --confirm  Publish it (cannot be undone)
 
-A draft has no public archive page, so an unpublished article is invisible to
-readers and to search engines no matter what the workflow reported.
+A draft can be published only when:
+  - at least MIN_EDIT_RATIO of its words differ from the AI draft
+  - every item under "公開前に必ず確認する事実" is ticked [x] or removed
 `.trim();
+
+const show = (path: string): string => relative(process.cwd(), path).replace(/\\/g, '/');
+
+function report(d: DraftInspection, minEditRatio: number): void {
+  const title = d.parsed?.meta.title ?? '(読み込めません)';
+  console.log(`  ${d.ready ? '[公開可] ' : '[未完了] '} ${show(d.path)}`);
+  console.log(`             ${title}`);
+  if (d.parsed) {
+    const change = d.hasBaseline ? `変更率 ${pct(d.editRatio)}（必要 ${pct(minEditRatio)}）` : 'AI下書きなし（一から作成）';
+    console.log(`             ${change} / 未確認の事実 ${d.unchecked}件 / 無料 ${d.freeWords}語・有料 ${d.paidWords}語`);
+  }
+  for (const p of d.problems) console.log(`             - ${p}`);
+}
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -40,108 +48,132 @@ async function main(): Promise<void> {
     return;
   }
 
-  const confirm = argv.includes('--confirm');
-  const limitFlag = argv.indexOf('--limit');
-  const limit = limitFlag >= 0 ? Number(argv[limitFlag + 1]) : Infinity;
-
   const config = loadConfig();
-  const client = new ButtondownClient(config);
+  const min = config.MIN_EDIT_RATIO;
+  const confirm = argv.includes('--confirm');
+  const file = argv.find((a) => !a.startsWith('-'));
 
-  const { subscribers } = await client.verify();
-  const emails = await client.listEmails();
-  const drafts = emails.filter((e) => e.status === 'draft').slice(0, limit);
-
-  if (drafts.length === 0) {
-    console.log('公開待ちの下書きはありません。');
+  if (!file) {
+    const drafts = await listDrafts(min);
+    if (drafts.length === 0) {
+      console.log('drafts/ に下書きがありません。npm run draft で作成できます。');
+      return;
+    }
+    console.log(`下書き ${drafts.length}件\n`);
+    for (const d of drafts) {
+      report(d, min);
+      console.log();
+    }
     return;
   }
 
-  console.log(`公開待ち: ${drafts.length}件  /  購読者: ${subscribers}人\n`);
-  for (const d of drafts) {
-    console.log(`  ${d.subject}`);
-    console.log(`    ${d.absolute_url ?? '(URL不明)'}`);
+  const inspection = await inspectDraft(file, min);
+  console.log();
+  report(inspection, min);
+  console.log();
+
+  const parsed = inspection.parsed;
+  if (!inspection.ready || !parsed) {
+    console.log('公開できません。上の項目を直してから、もう一度実行してください。');
+    process.exitCode = 1;
+    return;
   }
+
+  const { meta, free, paid } = parsed;
+
+  const history = await loadHistory();
+  const candidates = history
+    .filter((h) => h.slug !== meta.slug)
+    .reverse()
+    .slice(0, config.SEO_RELATED_LINKS * 3)
+    .map((h) => ({ title: h.title, url: h.url }));
+  const related = await filterLiveLinks(candidates, config.SEO_RELATED_LINKS);
+
+  const body = buildBody({ free, paid, related, category: meta.category });
 
   if (!confirm) {
-    console.log(
-      `\n何も変更していません。実行するには --confirm を付けてください。\n` +
-        (subscribers === 0
-          ? '  購読者0人なのでメールは誰にも届きません。効果はアーカイブページの公開のみです。\n'
-          : `  警告: ${subscribers}人の購読者にメールが届きます。\n`),
-    );
+    console.log('公開すると、次の内容で送信します。');
+    console.log(`  件名        ${meta.title}`);
+    console.log(`  slug        ${meta.slug}`);
+    console.log(`  説明文      ${meta.meta_description || '(なし)'}`);
+    console.log(`  内部リンク  ${related.length}件`);
+    console.log(`  医療免責文  ${meta.category === 'healthcare' ? 'あり' : 'なし'}`);
+    console.log('\n何も公開していません。公開するには --confirm を付けてください（取り消せません）。');
     return;
   }
 
-  console.log();
-  let published = 0;
+  const client = new ButtondownClient(config);
+  const { username, subscribers } = await client.verify();
+  console.log(`Buttondown: ${username} / 購読者 ${subscribers}人`);
 
-  for (const draft of drafts) {
-    process.stdout.write(`${draft.subject.slice(0, 45)} ... `);
+  const created = await client.createEmail({
+    subject: meta.title,
+    body,
+    slug: meta.slug,
+    description: meta.meta_description,
+  });
 
+  // Creating an email always yields a draft; sending is a separate transition.
+  let status = created.status;
+  if (status === 'draft') {
     try {
-      const updated = await client.setEmailStatus(draft.id, 'about_to_send');
-      const settled = await waitForStatus(client, draft.id, updated.status);
-
-      // Buttondown moves through about_to_send -> in_flight -> sent, so the
-      // status right after the call says little. What matters is whether the
-      // archive page exists, which is the thing readers and crawlers hit.
-      const live = draft.absolute_url ? await isLive(draft.absolute_url) : null;
-
-      if (live === true) {
-        console.log(`OK (${settled}) — ページ公開を確認`);
-        published += 1;
-      } else if (PUBLISHED.has(settled)) {
-        console.log(`${settled} — 反映待ち（ページはまだ404）`);
-      } else {
-        console.log(`失敗: status が ${settled} のままです`);
-      }
+      status = (await client.setEmailStatus(created.id, 'about_to_send')).status;
     } catch (error) {
-      console.log(`エラー: ${error instanceof Error ? error.message.slice(0, 200) : error}`);
+      console.warn(
+        `\n[publish] 記事は作成しましたが、公開状態にできませんでした: ` +
+          `${error instanceof Error ? error.message.slice(0, 300) : error}`,
+      );
     }
   }
 
-  console.log(`\n公開を確認: ${published}/${drafts.length}`);
-  if (published < drafts.length) {
+  const url = created.absolute_url ?? '';
+  const live = url ? (await filterLiveLinks([{ title: meta.title, url }], 1)).length > 0 : false;
+
+  await appendHistory({
+    publishedAt: new Date().toISOString(),
+    topic: meta.topic,
+    category: meta.category,
+    title: meta.title,
+    slug: created.slug ?? meta.slug,
+    targetQuery: meta.target_query,
+    metaTitle: meta.title,
+    postId: created.id,
+    url,
+    model: meta.model,
+    usage: { inputTokens: meta.input_tokens, outputTokens: meta.output_tokens },
+    editRatio: inspection.editRatio,
+  });
+
+  await saveArticle({
+    title: meta.title,
+    slug: created.slug ?? meta.slug,
+    category: meta.category,
+    target_query: meta.target_query,
+    meta_description: meta.meta_description,
+    body_markdown: `${free}\n\n${paid}`,
+    tags: meta.tags,
+    editRatio: inspection.editRatio,
+  });
+
+  let archived = '';
+  try {
+    archived = show(await archiveDraft(inspection.path));
+  } catch {
+    // A synced folder can hold the file open; the draft simply stays put.
+  }
+
+  console.log(`\n状態       ${status}`);
+  console.log(`URL        ${url || '(不明)'}`);
+  console.log(`公開ページ ${live ? '確認できました' : 'まだ見えません'}`);
+  if (archived) console.log(`下書き     ${archived} に移動`);
+  if (!live) {
     console.log(
-      '反映に時間がかかることがあります。数分後に `npm run status` で再確認してください。',
+      '\n公開ページが見えない場合、Buttondown アカウントが承認されていない可能性があります。' +
+        '\nnpm run status でニュースレター全体が 404 になっていないか確認してください。',
     );
   }
+  console.log('\n履歴を残すには:  git add data/history data/articles && git commit -m "record published article"');
 }
-
-/** Poll until the status stops being a transitional one. */
-async function waitForStatus(
-  client: ButtondownClient,
-  id: string,
-  initial: string,
-): Promise<string> {
-  let status = initial;
-
-  for (let i = 0; i < POLL_ATTEMPTS; i += 1) {
-    if (status === 'sent' || status === 'draft' || status === 'errored') return status;
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    try {
-      status = (await client.getEmail(id)).status;
-    } catch {
-      return status;
-    }
-  }
-  return status;
-}
-
-async function isLive(url: string): Promise<boolean | null> {
-  try {
-    const r = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(8000),
-    });
-    return r.ok;
-  } catch {
-    return null;
-  }
-}
-
-export type { ButtondownEmail };
 
 main().catch((error: unknown) => {
   console.error('\n[FAILED]', error instanceof Error ? error.message : error);

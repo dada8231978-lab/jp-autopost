@@ -1,35 +1,23 @@
-import { writeFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative } from 'node:path';
 import { loadConfig } from './config.js';
-import { generateArticle } from './generator.js';
-import { Publisher, buildPostHtml, filterLiveLinks, type RelatedLink } from './publisher.js';
-import {
-  appendHistory,
-  loadHistory,
-  pickTopic,
-  recentTitles,
-  resolveCategory,
-  saveArticle,
-} from './topics.js';
+import { generateDraft } from './generator.js';
+import { loadHistory, pickTopic, recentTitles, resolveCategory } from './topics.js';
+import { writeNewDraft } from './draft-file.js';
 import { countWords } from './html.js';
 import { CategorySchema, type Category } from './types.js';
 
 interface CliArgs {
-  dryRun: boolean;
   topic?: string;
   category?: Category;
   help: boolean;
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
-  const args: CliArgs = { dryRun: false, help: false };
+  const args: CliArgs = { help: false };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
-      case '--dry-run':
-        args.dryRun = true;
-        break;
       case '--help':
       case '-h':
         args.help = true;
@@ -39,9 +27,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
         break;
       case '--category': {
         const parsed = CategorySchema.safeParse(argv[++i]);
-        if (!parsed.success) {
-          throw new Error('--category must be "culture" or "healthcare"');
-        }
+        if (!parsed.success) throw new Error('--category must be "culture" or "healthcare"');
         args.category = parsed.data;
         break;
       }
@@ -53,21 +39,22 @@ function parseArgs(argv: readonly string[]): CliArgs {
 }
 
 const HELP = `
-Generate one English article about Japan and publish it to Buttondown behind a paywall.
+Draft a piece for you to rewrite. Publishes nothing.
 
 Usage:
-  npm run post                            Generate + publish using .env settings
-  npm run dry-run                         Generate only; write an HTML preview, publish nothing
-  npm run verify                          Check the Buttondown connection and show the economics
-  npx tsx src/index.ts --topic "..."      Override the seed topic
-  npx tsx src/index.ts --category culture Force a beat (culture | healthcare)
+  npm run draft                             Pick the next topic and write drafts/<slug>.md
+  npm run draft -- --topic "..."            Use your own topic
+  npm run draft -- --category healthcare    Force an area (culture | healthcare)
 
-Flags:
-  --dry-run          Do not touch Buttondown. Writes data/preview-<slug>.html
-  --topic <text>     Seed topic instead of picking from the rotation
-  --category <name>  culture | healthcare
-  -h, --help         Show this help
+Then:
+  1. Rewrite the draft in your own words
+  2. Check every claim in its fact list against a primary source
+  3. npm run publish -- drafts/<slug>.md    Checks the draft; add --confirm to publish
 `.trim();
+
+/** claude-sonnet-5, USD per million tokens — for the cost line only. */
+const PRICE_IN = 2;
+const PRICE_OUT = 10;
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -77,127 +64,42 @@ async function main(): Promise<void> {
   }
 
   const config = loadConfig();
-  const startedAt = Date.now();
-
-  // ---- 1. Choose the topic -------------------------------------------------
   const history = await loadHistory();
   const category =
     args.category ?? resolveCategory(config.TOPIC_CATEGORY, config.HEALTHCARE_RATIO, history);
   const topic = args.topic ?? pickTopic(category, history).topic;
 
-  console.log(`[1/4] Topic  : ${topic}`);
-  console.log(
-    `      Beat   : ${category}` +
-      (config.TOPIC_CATEGORY === 'mixed'
-        ? ` (target ${Math.round(config.HEALTHCARE_RATIO * 100)}% healthcare)`
-        : ''),
-  );
-  console.log(`      Model  : ${config.ANTHROPIC_MODEL} (effort: ${config.ANTHROPIC_EFFORT})`);
+  console.log(`Topic : ${topic}`);
+  console.log(`Area  : ${category}`);
+  console.log(`Model : ${config.ANTHROPIC_MODEL} (effort: ${config.ANTHROPIC_EFFORT})\n`);
+  console.log('下書きを作成しています（1分ほどかかります）…');
 
-  // ---- 2. Verify Buttondown before spending on generation -------------------
-  let publisher: Publisher | undefined;
-
-  if (!args.dryRun) {
-    publisher = new Publisher(config);
-    const who = await publisher.verifyConnection();
-    console.log(`[2/4] Buttondown: ${who}`);
-    console.log(
-      `      Posting as status="${config.BUTTONDOWN_EMAIL_STATUS}", ` +
-        `audience="${config.BUTTONDOWN_EMAIL_TYPE}"`,
-    );
-  } else {
-    console.log('[2/4] Buttondown: skipped (--dry-run)');
-  }
-
-  // ---- 3. Generate ---------------------------------------------------------
-  const { article, usage, model } = await generateArticle({
+  const { draft, usage, model } = await generateDraft({
     topic,
     category,
     avoidTitles: recentTitles(history),
-    targetWords: config.TARGET_WORD_COUNT,
   });
 
-  const freeWords = countWords(article.free_section_html);
-  const paidWords = countWords(article.paid_body_html);
-  // Internal links to earlier archive pages, newest first. These go above the
-  // paywall so crawlers can actually follow them.
-  //
-  // Verified live before use: an article still sitting as a draft has no public
-  // page, so linking to it would publish a 404 on a page meant to rank. Take
-  // more candidates than needed and keep the first that resolve.
-  const candidates: RelatedLink[] = history
-    .filter((h) => /^https?:\/\//.test(h.url) && h.slug !== article.slug)
-    .reverse()
-    .slice(0, config.SEO_RELATED_LINKS * 3)
-    .map((h) => ({ title: h.title, url: h.url }));
-
-  const related = await filterLiveLinks(candidates, config.SEO_RELATED_LINKS);
-
-  console.log(`[3/4] Title  : ${article.title}`);
-  console.log(`      Query  : "${article.target_query}"`);
-  console.log(
-    `      Links  : ${related.length} internal (above paywall)` +
-      (candidates.length > related.length
-        ? `, ${candidates.length - related.length} skipped (not published yet)`
-        : ''),
-  );
-  console.log(`      Words  : ${freeWords} free + ${paidWords} paid`);
-  console.log(`      Tags   : ${article.tags.join(', ')}`);
-  console.log(`      Tokens : ${usage.inputTokens} in / ${usage.outputTokens} out`);
-
-  // Persist the body so `npm run reddit` can work from it later.
-  await saveArticle(article);
-
-  // ---- 4. Publish (or preview) ---------------------------------------------
-  if (args.dryRun || !publisher) {
-    const previewPath = resolve(process.cwd(), `data/preview-${article.slug}.html`);
-    await mkdir(resolve(process.cwd(), 'data'), { recursive: true });
-    await writeFile(
-      previewPath,
-      renderPreview(article.title, buildPostHtml(article, related)),
-      'utf8',
-    );
-    console.log(`[4/4] Preview: ${previewPath}`);
-    console.log('      Nothing was published (--dry-run).');
-    return;
-  }
-
-  const result = await publisher.publish(article, related);
-  console.log(`[4/4] Posted : ${result.url}`);
-  console.log(`      Status : ${result.status}`);
-  if (result.status === 'draft') {
-    console.log('      This is a DRAFT. Open Buttondown and hit send when you are happy with it.');
-  }
-
-  await appendHistory({
-    publishedAt: new Date().toISOString(),
+  const path = await writeNewDraft(draft, {
     topic,
-    category,
-    title: result.subject,
-    slug: result.slug,
-    targetQuery: article.target_query,
-    metaTitle: article.meta_title,
-    postId: result.id,
-    url: result.url,
     model,
-    usage,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
   });
 
-  console.log(`Done in ${((Date.now() - startedAt) / 1000).toFixed(1)}s.`);
-}
+  const cost = (usage.inputTokens * PRICE_IN + usage.outputTokens * PRICE_OUT) / 1_000_000;
+  const shown = relative(process.cwd(), path).replace(/\\/g, '/');
 
-/** Wrap the post HTML in a minimal page so the preview is readable in a browser. */
-function renderPreview(title: string, html: string): string {
-  const marked = html.replace(
-    '<div role="paywall"></div>',
-    '<hr style="border:none;border-top:3px dashed #c00;margin:2.5rem 0"><p style="color:#c00;font-weight:700">▼ PAYWALL — everything below is paid-only ▼</p>',
-  );
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${title}</title>
-<style>body{max-width:44rem;margin:3rem auto;padding:0 1.25rem;font:17px/1.7 Georgia,serif;color:#222}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.5rem}</style>
-</head><body><h1>${title}</h1>
-${marked}
-</body></html>`;
+  console.log(`\n下書き: ${shown}`);
+  console.log(`  見出し          ${draft.title}`);
+  console.log(`  分量            無料 ${countWords(draft.free_section_md)}語 / 有料 ${countWords(draft.paid_body_md)}語`);
+  console.log(`  確認すべき事実  ${draft.claims_to_verify.length}件`);
+  console.log(`  あなたへの問い  ${draft.author_prompts.length}件`);
+  console.log(`  生成コスト      $${cost.toFixed(3)}`);
+  console.log('\n次にやること:');
+  console.log('  1. ファイルを開き、本文を自分の言葉で書き直す');
+  console.log('  2. 「公開前に必ず確認する事実」を一次情報で確かめ、[ ] を [x] にする');
+  console.log(`  3. npm run publish -- ${shown}   （公開できる状態か確認。公開は --confirm を付けたときだけ）\n`);
 }
 
 main().catch((error: unknown) => {

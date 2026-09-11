@@ -7,7 +7,7 @@ import { loadConfig, type Config } from './config.js';
 import { RedditClient } from './reddit.js';
 import { loadArticle, latestArticleSlug } from './topics.js';
 import { countWords } from './html.js';
-import type { Article } from './types.js';
+import type { StoredArticle } from './types.js';
 
 const HISTORY_PATH = resolve(process.cwd(), 'data/reddit-posts.json');
 
@@ -44,7 +44,7 @@ const RedditPostSchema = z.object({
 
 type RedditPost = z.infer<typeof RedditPostSchema>;
 
-const SYSTEM_PROMPT = `You write Reddit posts. You are a person who lives in Japan and finds this stuff genuinely interesting, not a marketer.
+const SYSTEM_PROMPT = `You draft Reddit posts for an author to rewrite in their own words and post under their own name. Do not invent a persona or personal experience, and do not claim to live anywhere; write plainly about the material.
 
 Reddit punishes promotional writing harder than any other platform. A post that reads like content marketing gets downvoted, reported, and removed, and repeat offences get the account and the linked domain banned site-wide. So the post you write must earn its place on its own merits.
 
@@ -60,13 +60,18 @@ HARD RULES
 - Never mention a newsletter, subscription, paywall, or the word "article".`;
 
 export async function generateRedditPost(
-  article: Article,
+  article: StoredArticle,
   subreddit: string,
 ): Promise<RedditPost> {
   const config = loadConfig();
   const client = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
 
-  const source = `${article.free_section_html}\n${article.paid_body_html}`.replace(/<[^>]+>/g, ' ');
+  // Articles published before the draft workflow stored HTML sections instead.
+  const legacy = article as unknown as { free_section_html?: string; paid_body_html?: string };
+  const source = (
+    article.body_markdown ?? `${legacy.free_section_html ?? ''}
+${legacy.paid_body_html ?? ''}`
+  ).replace(/<[^>]+>/g, ' ');
 
   const response = await client.messages.parse({
     model: config.ANTHROPIC_MODEL,

@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import type { Article, Category, PublishRecord } from './types.js';
+import type { Category, PublishRecord, StoredArticle } from './types.js';
 
 const HISTORY_PATH = resolve(process.cwd(), 'data/published.json');
 const HISTORY_DIR = resolve(process.cwd(), 'data/history');
@@ -188,7 +188,7 @@ export function resolveCategory(
  * Persist the generated article body. The publish history only records
  * metadata; the Reddit command needs the actual text to work from.
  */
-export async function saveArticle(article: Article): Promise<void> {
+export async function saveArticle(article: StoredArticle): Promise<void> {
   await mkdir(ARTICLES_DIR, { recursive: true });
   await writeFile(
     resolve(ARTICLES_DIR, `${article.slug}.json`),
@@ -197,9 +197,9 @@ export async function saveArticle(article: Article): Promise<void> {
   );
 }
 
-export async function loadArticle(slug: string): Promise<Article> {
+export async function loadArticle(slug: string): Promise<StoredArticle> {
   const raw = await readFile(resolve(ARTICLES_DIR, `${slug}.json`), 'utf8');
-  return JSON.parse(raw) as Article;
+  return JSON.parse(raw) as StoredArticle;
 }
 
 /** Slug of the most recently published article that still has a saved body. */
